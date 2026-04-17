@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+
 import requests
 import pandas as pd
+
 from config import NEWSAPI_KEY, NEWSAPI_BASE_URL
 class NewsScraper:
     def __init__(self, ticker: str, company_name: str):
@@ -9,7 +11,7 @@ class NewsScraper:
         self.api_key = NEWSAPI_KEY
         self.base_url = NEWSAPI_BASE_URL
     def fetch_headlines(self, days_back: int):
-        from_date = (datetime.now() - timedelta(days_back)).strftime('%Y-%m-%d')
+        from_date = (datetime.now() - timedelta(days_back)).strftime("%Y-%m-%d")
         to_date = datetime.now().strftime('%Y-%m-%d')
         params = {
             "q": f'"{self.company_name}" AND (stock OR shares OR earnings OR market OR investor)',
@@ -41,12 +43,29 @@ class NewsScraper:
         })
         df = df[df['headline'].notna()]
         df = df[df['headline'] != "[Removed]"]
+        df = df[df['headline'].apply(self.is_relevant)]
         df['date'] = pd.to_datetime(df['date']).dt.date
         df = df.reset_index(drop=True)
         return df
+    # def save_raw(self, df: pd.DataFrame):
+    #     filename = f"data/raw/{self.ticker}_{datetime.now().strftime("%Y-%m-%d")}.csv"
+    #     df.to_csv(filename, index=False)
+    #     print(f"Saved to {filename}")
+    def is_relevant(self, headline: str):
+        headline_lower = headline.lower()
+        company_lower = self.company_name.lower()
+        finance_keywords = [
+            "stock", "shares", "earnings", "market", "investor",
+            "revenue", "profit", "loss", "quarterly", "forecast",
+            "analyst", "trading", "nasdaq", "nyse", "valuation"
+        ]
+        has_company = company_lower in headline_lower
+        has_finance = any(word in headline_lower for word in finance_keywords)
+        return has_company and has_finance
 if __name__ == '__main__':
     scraper = NewsScraper(ticker='AAPL', company_name='Apple')
     df = scraper.fetch_headlines(days_back=7)
     print(df.head(10))
     print(df.shape)
     print(df.dtypes)
+    # scraper.save_raw(df)
